@@ -13,7 +13,7 @@ val chiselTestVersion = "0.5.4"
 val breezeVersion = "2.0"
 val dspVersion = "1.5.6"
 
-lazy val root = (project in file("."))
+lazy val clockmux = (project in file("."))
   .settings(
     name := "clockmux_glitchfree",
     libraryDependencies ++= Seq(
