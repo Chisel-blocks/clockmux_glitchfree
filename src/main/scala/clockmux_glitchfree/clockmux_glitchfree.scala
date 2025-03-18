@@ -65,6 +65,10 @@ class clockmux_glitchfree(n_clocks: Int) extends Module {
   // respective clock
   val one_hot_sel = UIntToOH(io.sel)
 
+  val inverted_clocks = VecInit(Seq.tabulate(n_clocks) { i =>
+    (~io.clock_in(i).asBool).asClock
+  })
+
   // Synchronize reset to all clock domains
   val reset_syncs = for (i <- 0 until n_clocks) yield {
     val reset_sync = Module(new ClockMuxResetSync(false))
@@ -77,12 +81,12 @@ class clockmux_glitchfree(n_clocks: Int) extends Module {
   val reset_n_syncs = for (i <- 0 until n_clocks) yield {
     val reset_sync = Module(new ClockMuxResetSync(false))
     reset_sync.io.areset_in := reset.asAsyncReset
-    reset_sync.io.clock     := (~io.clock_in(i).asBool).asClock
+    reset_sync.io.clock     := inverted_clocks(i)
     reset_sync
   }
 
   val enables = for (i <- 0 until n_clocks) yield {
-    val out_reg = withClockAndReset((~io.clock_in(i).asBool).asClock, reset_n_syncs(i).io.areset_sync) { RegInit(false.B) }
+    val out_reg = withClockAndReset(inverted_clocks(i), reset_n_syncs(i).io.areset_sync) { RegInit(false.B) }
     out_reg
   }
 
