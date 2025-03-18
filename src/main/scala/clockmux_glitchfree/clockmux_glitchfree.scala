@@ -12,6 +12,42 @@ import chisel3.util._
 import chisel3.experimental._
 import chisel3.stage.{ChiselStage, ChiselGeneratorAnnotation}
 
+class ClockMuxResetSync(activeLow: Boolean = false) extends BlackBox with HasBlackBoxInline {
+  val io = IO(new Bundle {
+    val clock        = Input(Clock())        // system clock
+    val areset_in    = Input(AsyncReset())   // async reset from external world with configurable polarity
+    val areset_sync  = Output(AsyncReset())  // active high async reset with synchronized deassertion
+  })
+  val polarity = if (activeLow) "negedge" else "posedge"
+  val level = if (activeLow) "!areset_in" else "areset_in"
+
+  override def desiredName = s"ClockMuxResetSync_$polarity"
+
+  setInline(
+    s"ClockMuxResetSync_$polarity.v",
+    s"""
+    |module ClockMuxResetSync_$polarity(
+    |  input  wire clock,
+    |  input  wire areset_in,
+    |  output wire areset_sync,
+    |  output wire aresetn_sync
+    |);
+    |  reg first, second;
+    |  always @(posedge clock or $polarity areset_in)
+    |    if ($level) begin
+    |      first <= 1'b1;
+    |      second <= 1'b1;
+    |    end else begin
+    |      first <= 1'b0;
+    |      second <= first;
+    |    end
+    |  assign areset_sync = second;
+    |endmodule
+    """.stripMargin
+  )
+}
+
+
 class clockmux_glitchfreeIO(n_clocks: Int) extends Bundle {
  val clock_in = Input(Vec(n_clocks, Clock()))
  val sel = Input(UInt(log2Ceil(n_clocks).W))
@@ -29,8 +65,24 @@ class clockmux_glitchfree(n_clocks: Int) extends Module {
   // respective clock
   val one_hot_sel = UIntToOH(io.sel)
 
+  // Synchronize reset to all clock domains
+  val reset_syncs = for (i <- 0 until n_clocks) yield {
+    val reset_sync = Module(new ClockMuxResetSync(false))
+    reset_sync.io.areset_in := reset.asAsyncReset
+    reset_sync.io.clock     := io.clock_in(i)
+    reset_sync
+  }
+
+  // Synchronize reset to inverted clock domain
+  val reset_n_syncs = for (i <- 0 until n_clocks) yield {
+    val reset_sync = Module(new ClockMuxResetSync(false))
+    reset_sync.io.areset_in := reset.asAsyncReset
+    reset_sync.io.clock     := (~io.clock_in(i).asBool).asClock
+    reset_sync
+  }
+
   val enables = for (i <- 0 until n_clocks) yield {
-    val out_reg = withClock((~io.clock_in(i).asBool).asClock) { RegInit(false.B) }
+    val out_reg = withClockAndReset((~io.clock_in(i).asBool).asClock, reset_n_syncs(i).io.areset_sync) { RegInit(false.B) }
     out_reg
   }
 
@@ -42,8 +94,8 @@ class clockmux_glitchfree(n_clocks: Int) extends Module {
   })
 
   val synchronizers = for (i <- 0 until n_clocks) yield {
-    val first = withClock(io.clock_in(i)) { RegNext(synchronizer_inputs(i)) }
-    val second = withClock(io.clock_in(i)) { RegNext(first) }
+    val first = withClockAndReset(io.clock_in(i), reset_syncs(i).io.areset_sync) { RegNext(synchronizer_inputs(i), false.B) }
+    val second = withClockAndReset(io.clock_in(i), reset_syncs(i).io.areset_sync) { RegNext(first, false.B) }
     second 
   }
 
