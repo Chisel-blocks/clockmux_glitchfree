@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Generalization of a 2-to-1 clock multiplexer shown in 
-// Intel Quartus Prime Pro Edition User Guide: Design Recommendations
-// https://www.intel.com/content/www/us/en/docs/programmable/683082/22-1/clock-multiplexing.html
-
 // Initially written by Tomi Valkonen (tomi.j.valkonen@aalto.fi), 2025-02-06
 package clockmux_glitchfree
 
@@ -15,7 +11,7 @@ import chisel3.stage.{ChiselStage, ChiselGeneratorAnnotation}
 class ClockMuxResetSync(activeLow: Boolean = false) extends BlackBox with HasBlackBoxInline {
   val io = IO(new Bundle {
     val clock        = Input(Clock())        // system clock
-    val areset_in    = Input(AsyncReset())   // async reset from external world with configurable polarity
+    val areset_in    = Input(AsyncReset())   // async reset from external world
     val areset_sync  = Output(AsyncReset())  // active high async reset with synchronized deassertion
   })
   val polarity = if (activeLow) "negedge" else "posedge"
@@ -55,6 +51,15 @@ class clockmux_glitchfreeIO(n_clocks: Int) extends Bundle {
  val clock_out = Output(Clock())
 }
 
+/**
+  *
+  * Generalization of a 2-to-1 clock multiplexer shown in 
+  * Intel Quartus Prime Pro Edition User Guide: Design Recommendations
+  * https://www.intel.com/content/www/us/en/docs/programmable/683082/22-1/clock-multiplexing.html
+  * 
+  *
+  * @param n_clocks
+  */
 class clockmux_glitchfree(n_clocks: Int) extends RawModule {
   require(n_clocks > 0, "Number of clocks cannot be zero")
   val io = IO(new clockmux_glitchfreeIO(n_clocks))
