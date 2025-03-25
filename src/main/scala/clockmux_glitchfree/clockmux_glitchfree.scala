@@ -50,11 +50,12 @@ class ClockMuxResetSync(activeLow: Boolean = false) extends BlackBox with HasBla
 
 class clockmux_glitchfreeIO(n_clocks: Int) extends Bundle {
  val clock_in = Input(Vec(n_clocks, Clock()))
+ val areset = Input(AsyncReset())
  val sel = Input(UInt(log2Ceil(n_clocks).W))
  val clock_out = Output(Clock())
 }
 
-class clockmux_glitchfree(n_clocks: Int) extends Module {
+class clockmux_glitchfree(n_clocks: Int) extends RawModule {
   require(n_clocks > 0, "Number of clocks cannot be zero")
   val io = IO(new clockmux_glitchfreeIO(n_clocks))
 
@@ -72,7 +73,7 @@ class clockmux_glitchfree(n_clocks: Int) extends Module {
   // Synchronize reset to all clock domains
   val reset_syncs = for (i <- 0 until n_clocks) yield {
     val reset_sync = Module(new ClockMuxResetSync(false))
-    reset_sync.io.areset_in := reset.asAsyncReset
+    reset_sync.io.areset_in := io.areset
     reset_sync.io.clock     := io.clock_in(i)
     reset_sync
   }
@@ -80,7 +81,7 @@ class clockmux_glitchfree(n_clocks: Int) extends Module {
   // Synchronize reset to inverted clock domain
   val reset_n_syncs = for (i <- 0 until n_clocks) yield {
     val reset_sync = Module(new ClockMuxResetSync(false))
-    reset_sync.io.areset_in := reset.asAsyncReset
+    reset_sync.io.areset_in := io.areset
     reset_sync.io.clock     := inverted_clocks(i)
     reset_sync
   }
