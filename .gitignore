@@ -1,0 +1,14 @@
+Makefile*
+.bloop/*
+.metals/*
+.idea/*
+*~
+logs_*
+*.swp
+*.json
+*.fir
+project/*
+target/*
+src/test/scala/project/*
+src/test/scala/target/*
+verilog/
